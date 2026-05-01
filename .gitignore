@@ -1,0 +1,86 @@
+# ============================================
+# LEAD GEN SYSTEM - .gitignore
+# ============================================
+
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyo
+*.pyd
+.Python
+*.egg
+*.egg-info/
+dist/
+build/
+eggs/
+parts/
+var/
+sdist/
+develop-eggs/
+.installed.cfg
+lib/
+lib64/
+
+# ---- Virtual Environment ----
+venv/
+env/
+ENV/
+.venv/
+backend/venv/
+
+# ---- Environment Variables (NEVER commit these) ----
+.env
+.env.*
+*.env
+backend/.env
+
+# ---- Database (contains your real lead data) ----
+*.db
+*.sqlite
+*.sqlite3
+backend/leads.db
+
+# ---- Logs ----
+*.log
+logs/
+backend/logs/
+
+# ---- Node / Frontend ----
+node_modules/
+frontend/node_modules/
+dist/
+frontend/dist/
+.npm
+
+# ---- OS Files ----
+.DS_Store
+Thumbs.db
+desktop.ini
+*.swp
+*.swo
+
+# ---- IDE / Editor ----
+.vscode/settings.json
+.idea/
+*.sublime-project
+*.sublime-workspace
+
+# ---- Test Files (temporary, not needed in repo) ----
+backend/test_*.py
+backend/test_collectors.py
+backend/test_pipeline.py
+backend/test_reddit.py
+backend/test_telegram.py
+backend/test_outreach.py
+
+# ---- Google Service Account Key (if you add Sheets later) ----
+*.json
+service_account*.json
+credentials*.json
+
+# ---- Misc ----
+*.bak
+*.tmp
+*.temp
+.cache/
