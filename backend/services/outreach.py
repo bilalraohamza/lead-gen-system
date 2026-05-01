@@ -17,7 +17,13 @@ OUTREACH_MODELS = [
 ]
 
 
-def generate_outreach_message(lead: dict, sender_name: str = "Hasnain") -> str:
+def generate_outreach_message(lead: dict, sender_name: str = None) -> str:
+    from config_manager import get_value
+
+    if sender_name is None:
+        sender_name = get_value("sender_name") or "Hasnain"
+    sender_services = get_value("sender_services") or "Python automation, AI automation, web scraping"
+
     source_context = {
         "reddit": "Reddit post",
         "hackernews": "Hacker News thread",
@@ -30,12 +36,7 @@ def generate_outreach_message(lead: dict, sender_name: str = "Hasnain") -> str:
 You are an expert freelance consultant writing a personalized outreach message.
 
 The sender's name is {sender_name}.
-The sender offers these services:
-- Python automation and scripting
-- AI automation and ChatGPT integrations
-- Web scraping and data collection
-- API integrations and backend development
-- Chatbot development
+The sender offers these services: {sender_services}
 
 Write a short outreach message for this lead. The message will be sent as a direct message or email.
 

@@ -22,16 +22,10 @@ FREE_MODELS = [
 # Now this works because FREE_MODELS already exists
 model_cycle = cycle(FREE_MODELS)
 
-SERVICES_CONTEXT = """
-- Python automation (scripts, bots, workflow automation)
-- AI automation (ChatGPT integrations, AI agents, LLM tools)
-- Web scraping and data collection
-- Data processing and analysis scripts
-- API integrations
-- Backend development (Python, FastAPI, Flask)
-- Chatbot development
-- Browser automation (Selenium, Playwright)
-"""
+def get_services_context() -> str:
+    from config_manager import get_value
+    categories = get_value("service_categories")
+    return "\n".join(f"- {c}" for c in categories)
 
 DEFAULT_RESULT = {
     "intent_label": "maybe",
@@ -89,7 +83,7 @@ def classify_lead(title: str, body: str) -> dict:
 You are a lead qualification assistant for a programming services business.
 
 Our services:
-{SERVICES_CONTEXT}
+{get_services_context()}
 
 Analyze this post and return a JSON response only.
 No extra text, no markdown, no backticks, no explanation outside the JSON.

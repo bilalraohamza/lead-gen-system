@@ -29,3 +29,34 @@ export const runPipeline = () =>
 
 export const triggerDailySummary = () =>
   api.post("/leads/notify/daily")
+
+// Settings API
+export const getSettings = () =>
+  api.get("/settings/")
+
+export const updateCategories = (items) =>
+  api.post("/settings/categories", { items })
+
+export const updateSubreddits = (items) =>
+  api.post("/settings/subreddits", { items })
+
+export const updateIncludeKeywords = (items) =>
+  api.post("/settings/keywords/include", { items })
+
+export const updateBlacklistKeywords = (items) =>
+  api.post("/settings/keywords/blacklist", { items })
+
+export const updateCustomUrls = (items) =>
+  api.post("/settings/urls", { items })
+
+export const updateAlertScore = (value) =>
+  api.post("/settings/alert-score", { value })
+
+export const updateSenderName = (value) =>
+  api.post("/settings/sender-name", { value })
+
+export const updateSenderServices = (value) =>
+  api.post("/settings/sender-services", { value })
+
+export const resetSettings = () =>
+  api.post("/settings/reset")

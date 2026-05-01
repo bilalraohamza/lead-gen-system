@@ -2,18 +2,6 @@ import requests
 import time
 from datetime import datetime
 
-TARGET_SUBREDDITS = [
-    "forhire",
-    "slavelabour", 
-    "entrepreneur",
-    "smallbusiness",
-    "startups",
-    "SaaS",
-    "digitalnomad",
-    "businessideas",
-    "webdev",
-]
-
 HIRING_KEYWORDS = [
     "hire", "hiring", "need help", "looking for", "need a developer",
     "need someone", "budget", "pay", "paid", "contractor", "freelancer",
@@ -31,9 +19,11 @@ def passes_keyword_filter(text: str) -> bool:
 
 
 def collect_reddit_leads(limit_per_subreddit: int = 25) -> list[dict]:
+    from config_manager import get_value
+    subreddits = get_value("target_subreddits")
     leads = []
 
-    for subreddit_name in TARGET_SUBREDDITS:
+    for subreddit_name in subreddits:
         try:
             url = f"https://www.reddit.com/r/{subreddit_name}/new.json?limit={limit_per_subreddit}"
             response = requests.get(url, headers=HEADERS, timeout=10)

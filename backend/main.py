@@ -1,8 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from database import engine, Base
-from routers import leads
-from routers import outreach
+from routers import leads, outreach, settings
 from scheduler import start_scheduler
 
 Base.metadata.create_all(bind=engine)
@@ -19,6 +18,7 @@ app.add_middleware(
 
 app.include_router(leads.router)
 app.include_router(outreach.router)
+app.include_router(settings.router)
 
 
 @app.on_event("startup")
@@ -33,10 +33,6 @@ def root():
 
 @app.post("/run-pipeline")
 def trigger_pipeline_manually():
-    """
-    Manually trigger the full pipeline from the UI or API.
-    Useful for testing without waiting for the scheduled time.
-    """
     from scheduler import run_pipeline
     run_pipeline()
     return {"message": "Pipeline executed successfully"}
