@@ -4,16 +4,22 @@ import {
   getSettings, updateCategories, updateSubreddits,
   updateIncludeKeywords, updateBlacklistKeywords,
   updateCustomUrls, updateAlertScore,
-  updateSenderName, updateSenderServices, resetSettings,
+  updateSenderName, updateSenderServices,
+  resetSettings, getAiSuggestions,
 } from "../api/leads"
 import {
   Play, Bell, Info, Plus, X, Save,
   RefreshCw, Tag, Globe, Search,
   Ban, User, Sliders, Loader2,
+  Sparkles, CheckSquare, Square, Trash2,
 } from "lucide-react"
 
-function TagInput({ items, onAdd, onRemove, placeholder }) {
+function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, suggestType }) {
   const [input, setInput] = useState("")
+  const [selected, setSelected] = useState([])
+  const [suggesting, setSuggesting] = useState(false)
+  const [suggestions, setSuggestions] = useState([])
+  const [suggestErr, setSuggestErr] = useState("")
 
   const handleAdd = () => {
     const val = input.trim()
@@ -26,8 +32,65 @@ function TagInput({ items, onAdd, onRemove, placeholder }) {
     if (e.key === "Enter") { e.preventDefault(); handleAdd() }
   }
 
+  const toggleSelect = (item) => {
+    setSelected(s =>
+      s.includes(item) ? s.filter(i => i !== item) : [...s, item]
+    )
+  }
+
+  const toggleSelectAll = () => {
+    if (selected.length === items.length) {
+      setSelected([])
+    } else {
+      setSelected([...items])
+    }
+  }
+
+  const deleteSelected = () => {
+    if (selected.length === 0) return
+    const remaining = items.filter(i => !selected.includes(i))
+    onReplace(remaining)
+    setSelected([])
+  }
+
+  const handleSuggest = async () => {
+    if (!category) {
+      setSuggestErr("Select a service category first to get suggestions.")
+      setTimeout(() => setSuggestErr(""), 3000)
+      return
+    }
+    setSuggesting(true)
+    setSuggestions([])
+    setSuggestErr("")
+    try {
+      const r = await getAiSuggestions(category, suggestType)
+      setSuggestions(r.data.suggestions || [])
+    } catch {
+      setSuggestErr("AI suggestion failed. Try again.")
+    }
+    setSuggesting(false)
+  }
+
+  const addSuggestion = (val) => {
+    if (!items.includes(val)) {
+      onAdd(val)
+    }
+    setSuggestions(s => s.filter(i => i !== val))
+  }
+
+  const addAllSuggestions = () => {
+    const newItems = suggestions.filter(s => !items.includes(s))
+    if (newItems.length > 0) {
+      onReplace([...items, ...newItems])
+    }
+    setSuggestions([])
+  }
+
+  const allSelected = items.length > 0 && selected.length === items.length
+  const someSelected = selected.length > 0
+
   return (
-    <div className="space-y-2">
+    <div className="space-y-3">
       <div className="flex gap-2">
         <input
           type="text"
@@ -44,17 +107,102 @@ function TagInput({ items, onAdd, onRemove, placeholder }) {
           <Plus size={14} />
           Add
         </button>
+        {suggestType && (
+          <button
+            onClick={handleSuggest}
+            disabled={suggesting}
+            title="Get AI suggestions based on selected category"
+            className="flex items-center gap-1.5 px-3 py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white rounded-lg text-sm transition-colors"
+          >
+            {suggesting
+              ? <Loader2 size={14} className="animate-spin" />
+              : <Sparkles size={14} />
+            }
+            {suggesting ? "Thinking..." : "AI Suggest"}
+          </button>
+        )}
       </div>
+
+      {suggestErr && (
+        <p className="text-red-400 text-xs">{suggestErr}</p>
+      )}
+
+      {suggestions.length > 0 && (
+        <div className="bg-purple-950 border border-purple-800 rounded-lg p-3 space-y-2">
+          <div className="flex items-center justify-between">
+            <p className="text-purple-300 text-xs font-medium flex items-center gap-1.5">
+              <Sparkles size={12} />
+              AI Suggestions - click to add
+            </p>
+            <button
+              onClick={addAllSuggestions}
+              className="text-xs text-purple-300 hover:text-white border border-purple-700 hover:border-purple-500 px-2 py-1 rounded-lg transition-colors"
+            >
+              Add All
+            </button>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {suggestions.map(s => (
+              <button
+                key={s}
+                onClick={() => addSuggestion(s)}
+                className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
+                  items.includes(s)
+                    ? "border-gray-700 text-gray-600 cursor-not-allowed line-through"
+                    : "border-purple-700 text-purple-300 hover:bg-purple-800 hover:text-white"
+                }`}
+              >
+                {s}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {items.length > 0 && (
+        <div className="flex items-center gap-3 pb-1">
+          <button
+            onClick={toggleSelectAll}
+            className="flex items-center gap-1.5 text-xs text-gray-400 hover:text-white transition-colors"
+          >
+            {allSelected
+              ? <CheckSquare size={13} className="text-indigo-400" />
+              : <Square size={13} />
+            }
+            {allSelected ? "Deselect all" : "Select all"}
+          </button>
+
+          {someSelected && (
+            <button
+              onClick={deleteSelected}
+              className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors"
+            >
+              <Trash2 size={13} />
+              Delete selected ({selected.length})
+            </button>
+          )}
+        </div>
+      )}
+
       <div className="flex flex-wrap gap-2">
         {items.map(item => (
           <span
             key={item}
-            className="flex items-center gap-1.5 bg-gray-800 text-gray-300 text-xs px-3 py-1.5 rounded-full border border-gray-700"
+            onClick={() => toggleSelect(item)}
+            className={`flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border cursor-pointer transition-colors ${
+              selected.includes(item)
+                ? "bg-red-900 border-red-700 text-red-200"
+                : "bg-gray-800 border-gray-700 text-gray-300 hover:border-gray-600"
+            }`}
           >
+            {selected.includes(item)
+              ? <CheckSquare size={11} className="text-red-400" />
+              : <Square size={11} className="text-gray-600" />
+            }
             {item}
             <button
-              onClick={() => onRemove(item)}
-              className="text-gray-500 hover:text-red-400 transition-colors"
+              onClick={e => { e.stopPropagation(); onRemove(item); setSelected(s => s.filter(i => i !== item)) }}
+              className="text-gray-500 hover:text-red-400 transition-colors ml-0.5"
             >
               <X size={11} />
             </button>
@@ -113,6 +261,7 @@ export default function Settings() {
   const [alertScore,  setAlertScore]  = useState(70)
   const [senderName,  setSenderName]  = useState("")
   const [senderSvcs,  setSenderSvcs]  = useState("")
+  const [selectedCategory, setSelectedCategory] = useState("")
 
   useEffect(() => {
     getSettings().then(r => {
@@ -225,8 +374,25 @@ export default function Settings() {
           items={categories}
           onAdd={v => setCategories(p => [...p, v])}
           onRemove={v => setCategories(p => p.filter(i => i !== v))}
+          onReplace={v => setCategories(v)}
           placeholder="e.g. Video editing, Logo design, WordPress..."
         />
+
+        {categories.length > 0 && (
+          <div className="flex items-center gap-3 pt-1">
+            <span className="text-gray-500 text-xs">Get AI suggestions based on:</span>
+            <select
+              value={selectedCategory}
+              onChange={e => setSelectedCategory(e.target.value)}
+              className="bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
+            >
+              <option value="">Select a category...</option>
+              {categories.map(c => (
+                <option key={c} value={c}>{c}</option>
+              ))}
+            </select>
+          </div>
+        )}
       </Section>
 
       <Section
@@ -240,7 +406,10 @@ export default function Settings() {
           items={subreddits}
           onAdd={v => setSubreddits(p => [...p, v.replace("r/", "")])}
           onRemove={v => setSubreddits(p => p.filter(i => i !== v))}
+          onReplace={v => setSubreddits(v)}
           placeholder="e.g. videoediting, filmmakers, graphic_design..."
+          category={selectedCategory}
+          suggestType="subreddits"
         />
       </Section>
 
@@ -255,7 +424,10 @@ export default function Settings() {
           items={includeKws}
           onAdd={v => setIncludeKws(p => [...p, v])}
           onRemove={v => setIncludeKws(p => p.filter(i => i !== v))}
+          onReplace={v => setIncludeKws(v)}
           placeholder="e.g. video editor, premiere pro, after effects..."
+          category={selectedCategory}
+          suggestType="include_keywords"
         />
       </Section>
 
@@ -270,7 +442,10 @@ export default function Settings() {
           items={blacklistKws}
           onAdd={v => setBlacklistKws(p => [...p, v])}
           onRemove={v => setBlacklistKws(p => p.filter(i => i !== v))}
+          onReplace={v => setBlacklistKws(v)}
           placeholder="e.g. unpaid, volunteer, $0..."
+          category={selectedCategory}
+          suggestType="blacklist_keywords"
         />
       </Section>
 
@@ -285,6 +460,7 @@ export default function Settings() {
           items={customUrls}
           onAdd={v => setCustomUrls(p => [...p, v])}
           onRemove={v => setCustomUrls(p => p.filter(i => i !== v))}
+          onReplace={v => setCustomUrls(v)}
           placeholder="e.g. https://example.com/jobs..."
         />
         <p className="text-gray-600 text-xs">

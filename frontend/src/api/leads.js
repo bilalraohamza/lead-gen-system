@@ -60,3 +60,6 @@ export const updateSenderServices = (value) =>
 
 export const resetSettings = () =>
   api.post("/settings/reset")
+
+export const getAiSuggestions = (category, type) =>
+  api.post("/settings/suggest", { category, type })
