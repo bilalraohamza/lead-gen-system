@@ -149,7 +149,7 @@ export default function Leads() {
                     >
                       <MessageSquare size={15} />
                     </button>
-                    
+                    <a
                       href={lead.url}
                       target="_blank"
                       rel="noopener noreferrer"

@@ -6,6 +6,9 @@ export const getLeads = (params = {}) =>
 export const getStats = () =>
   api.get("/leads/stats")
 
+export const getCategories = () =>
+  api.get("/leads/categories")
+
 export const getLead = (id) =>
   api.get(`/leads/${id}`)
 

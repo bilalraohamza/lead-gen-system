@@ -1,8 +1,8 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
+from models import Lead
 from services.telegram_bot import send_daily_summary
-from services.lead_service import get_leads, get_lead_by_id, update_lead_status, get_stats
 from services.lead_service import (
     get_leads,
     get_lead_by_id,
@@ -18,18 +18,48 @@ def list_leads(
     source: str = Query(None),
     intent: str = Query(None),
     status: str = Query(None),
+    category: str = Query(None),
+    search: str = Query(None),
+    sort_by: str = Query("score"),
+    sort_dir: str = Query("desc"),
     min_score: float = Query(0.0),
     limit: int = Query(50),
     offset: int = Query(0),
     db: Session = Depends(get_db),
 ):
-    leads = get_leads(db, source, intent, status, min_score, limit, offset)
+    leads = get_leads(
+        db,
+        source=source,
+        intent=intent,
+        status=status,
+        category=category,
+        search=search,
+        sort_by=sort_by,
+        sort_dir=sort_dir,
+        min_score=min_score,
+        limit=limit,
+        offset=offset,
+    )
     return {"leads": [lead.__dict__ for lead in leads], "count": len(leads)}
 
 
 @router.get("/stats")
 def lead_stats(db: Session = Depends(get_db)):
     return get_stats(db)
+
+
+@router.get("/categories")
+def get_categories(db: Session = Depends(get_db)):
+    """
+    Returns distinct service categories found in the database.
+    Used to populate the category filter dropdown in the frontend.
+    """
+    results = db.query(Lead.specific_service)\
+        .filter(Lead.specific_service != None)\
+        .distinct()\
+        .all()
+    categories = sorted([r[0] for r in results if r[0]])
+    return {"categories": categories}
 
 
 @router.get("/{lead_id}")
