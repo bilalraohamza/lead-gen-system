@@ -27,6 +27,9 @@ export const markSent = (id) =>
 export const runPipeline = () =>
   api.post("/run-pipeline")
 
+export const getPipelineStatus = () =>
+  api.get("/pipeline/status")
+
 export const triggerDailySummary = () =>
   api.post("/leads/notify/daily")
 
@@ -57,6 +60,9 @@ export const updateSenderName = (value) =>
 
 export const updateSenderServices = (value) =>
   api.post("/settings/sender-services", { value })
+
+export const updateStrictPrefilter = (value) =>
+  api.post("/settings/strict-prefilter", { value })
 
 export const resetSettings = () =>
   api.post("/settings/reset")

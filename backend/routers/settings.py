@@ -21,6 +21,10 @@ class UpdateScoreRequest(BaseModel):
     value: int
 
 
+class UpdateBoolRequest(BaseModel):
+    value: bool
+
+
 class SuggestRequest(BaseModel):
     category: str
     type: str
@@ -118,6 +122,12 @@ def update_sender_name(request: UpdateValueRequest):
 def update_sender_services(request: UpdateValueRequest):
     config = update_value("sender_services", request.value)
     return {"sender_services": config["sender_services"]}
+
+
+@router.post("/strict-prefilter")
+def update_strict_prefilter(request: UpdateBoolRequest):
+    config = update_value("strict_prefilter", request.value)
+    return {"strict_prefilter": config["strict_prefilter"]}
 
 
 @router.post("/suggest")

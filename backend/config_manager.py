@@ -40,6 +40,7 @@ DEFAULT_CONFIG = {
         "photo editing", "music", "voiceover",
         "$0", "unpaid", "volunteer", "data labeling",
     ],
+    "strict_prefilter": False,
     "custom_urls": [],
     "alert_min_score": 70,
     "sender_name": "Hasnain",

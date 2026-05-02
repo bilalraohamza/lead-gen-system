@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { useNavigate } from "react-router-dom"
-import { getStats, getLeads, runPipeline, triggerDailySummary } from "../api/leads"
+import { getStats, getLeads, runPipeline, triggerDailySummary, getPipelineStatus } from "../api/leads"
 import StatCard from "../components/StatCard"
 import Badge from "../components/Badge"
 import {
@@ -20,30 +20,77 @@ export default function Dashboard() {
   const [msgType, setMsgType] = useState("info")
   const navigate = useNavigate()
 
-  const fetchData = () => {
+  const fetchData = useCallback(() => {
     getStats().then(r => setStats(r.data)).catch(() => {})
     getLeads({ limit: 5, min_score: 0 }).then(r => setLeads(r.data.leads || [])).catch(() => {})
-  }
+  }, [])
 
-  useEffect(() => { fetchData() }, [])
-
-  const notify = (text, type = "info") => {
+  const notify = useCallback((text, type = "info") => {
     setMsg(text)
     setMsgType(type)
     setTimeout(() => setMsg(""), 5000)
-  }
+  }, [])
+
+  const startPolling = useCallback(() => {
+    if (window._pipelinePoll) clearInterval(window._pipelinePoll)
+
+    let pollCount = 0
+    window._pipelinePoll = setInterval(async () => {
+      pollCount += 1
+      try {
+        const statusRes = await getPipelineStatus()
+        fetchData()
+
+        if (!statusRes.data.running) {
+          clearInterval(window._pipelinePoll)
+          window._pipelinePoll = null
+          setRunning(false)
+          notify("Pipeline completed.", "success")
+        }
+      } catch {
+        // ignore polling errors
+      }
+
+      if (pollCount > 90) {
+        clearInterval(window._pipelinePoll)
+        window._pipelinePoll = null
+        setRunning(false)
+      }
+    }, 4000)
+  }, [fetchData, notify])
+
+  useEffect(() => {
+    fetchData()
+
+    getPipelineStatus()
+      .then(r => {
+        if (r.data.running) {
+          setRunning(true)
+          notify("Pipeline is running in background...", "info")
+          startPolling()
+        }
+      })
+      .catch(() => {})
+
+    return () => {
+      if (window._pipelinePoll) {
+        clearInterval(window._pipelinePoll)
+        window._pipelinePoll = null
+      }
+    }
+  }, [fetchData, notify, startPolling])
 
   const handleRunPipeline = async () => {
     setRunning(true)
-    notify("Pipeline is running. This may take a few minutes...")
+    notify("Pipeline started. Leads will appear as they are classified...", "info")
+
     try {
       await runPipeline()
-      notify("Pipeline completed successfully.", "success")
-      fetchData()
+      startPolling()
     } catch {
-      notify("Pipeline failed. Check backend terminal.", "error")
+      notify("Failed to start pipeline.", "error")
+      setRunning(false)
     }
-    setRunning(false)
   }
 
   const handleDailySummary = async () => {

@@ -28,6 +28,31 @@ function scoreColor(score) {
   return "text-gray-500"
 }
 
+function groupLeadsByDate(leads) {
+  const groups = {}
+  const now = new Date()
+
+  leads.forEach(lead => {
+    const collected = new Date(lead.collected_at)
+    const diffDays = Math.floor((now - collected) / (1000 * 60 * 60 * 24))
+
+    let label
+    if (diffDays === 0) label = "Today"
+    else if (diffDays === 1) label = "Yesterday"
+    else if (diffDays <= 7) label = "This Week"
+    else if (diffDays <= 30) label = "This Month"
+    else label = "Older"
+
+    if (!groups[label]) groups[label] = []
+    groups[label].push(lead)
+  })
+
+  const order = ["Today", "Yesterday", "This Week", "This Month", "Older"]
+  return order
+    .filter(label => groups[label])
+    .map(label => ({ label, leads: groups[label] }))
+}
+
 export default function Leads() {
   const [leads, setLeads] = useState([])
   const [categories, setCategories] = useState([])
@@ -42,6 +67,7 @@ export default function Leads() {
   const [sortBy, setSortBy] = useState("score")
   const [sortDir, setSortDir] = useState("desc")
   const [expanded, setExpanded] = useState(null)
+  const [viewMode, setViewMode] = useState("table")
   const navigate = useNavigate()
 
   useEffect(() => {
@@ -64,7 +90,8 @@ export default function Leads() {
   }, [source, intent, status, category, minScore, search, sortBy, sortDir])
 
   useEffect(() => {
-    fetchLeads()
+    const timer = window.setTimeout(fetchLeads, 0)
+    return () => window.clearTimeout(timer)
   }, [fetchLeads])
 
   const handleStatusChange = async (id, newStatus) => {
@@ -114,7 +141,7 @@ export default function Leads() {
 
   const sel = "bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500 cursor-pointer"
 
-  const SortIcon = ({ col }) => {
+  const renderSortIcon = col => {
     if (sortBy !== col) return <ArrowUpDown size={13} className="text-gray-600" />
     if (sortDir === "desc") return <ArrowDown size={13} className="text-indigo-400" />
     return <ArrowUp size={13} className="text-indigo-400" />
@@ -133,6 +160,28 @@ export default function Leads() {
               </span>
             )}
           </p>
+        </div>
+        <div className="flex items-center gap-3">
+          <button
+            onClick={() => setViewMode("table")}
+            className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+              viewMode === "table"
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-800 text-gray-400 hover:text-white"
+            }`}
+          >
+            Table View
+          </button>
+          <button
+            onClick={() => setViewMode("grouped")}
+            className={`text-xs px-3 py-1.5 rounded-lg transition-colors ${
+              viewMode === "grouped"
+                ? "bg-indigo-600 text-white"
+                : "bg-gray-800 text-gray-400 hover:text-white"
+            }`}
+          >
+            By Date
+          </button>
         </div>
       </div>
 
@@ -213,7 +262,7 @@ export default function Leads() {
                 }`}
               >
                 {opt.label}
-                <SortIcon col={opt.value} />
+                {renderSortIcon(opt.value)}
               </button>
             ))}
           </div>
@@ -259,6 +308,7 @@ export default function Leads() {
         )}
       </div>
 
+      {viewMode === "table" && (
       <div className="bg-gray-900 border border-gray-800 rounded-xl overflow-hidden">
         <table className="w-full text-sm">
           <thead>
@@ -270,7 +320,7 @@ export default function Leads() {
                 onClick={() => toggleSort("score")}
               >
                 <span className="flex items-center gap-1">
-                  Score <SortIcon col="score" />
+                  Score {renderSortIcon("score")}
                 </span>
               </th>
               <th className="text-left px-4 py-3">Intent</th>
@@ -394,6 +444,88 @@ export default function Leads() {
           </tbody>
         </table>
       </div>
+      )}
+
+      {viewMode === "grouped" && (
+        <div className="space-y-6">
+          {loading && (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center text-gray-500">
+              Loading leads...
+            </div>
+          )}
+          {!loading && leads.length === 0 && (
+            <div className="bg-gray-900 border border-gray-800 rounded-xl p-12 text-center text-gray-500">
+              No leads found. Try adjusting your filters.
+            </div>
+          )}
+          {!loading && groupLeadsByDate(leads).map(group => (
+            <div key={group.label}>
+              <div className="flex items-center gap-3 mb-3">
+                <span className="text-white font-semibold">{group.label}</span>
+                <span className="bg-gray-800 text-gray-400 text-xs px-2 py-0.5 rounded-full">
+                  {group.leads.length} leads
+                </span>
+                <div className="flex-1 h-px bg-gray-800" />
+              </div>
+              <div className="space-y-2">
+                {group.leads.map(lead => (
+                  <div
+                    key={lead.id}
+                    className="bg-gray-900 border border-gray-800 rounded-xl p-4 hover:border-gray-700 transition-colors"
+                  >
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Badge label={lead.intent_label} />
+                          <span className={`text-sm font-bold ${scoreColor(lead.score)}`}>
+                            {lead.score}
+                          </span>
+                          <span className="text-gray-600 text-xs capitalize">{lead.source}</span>
+                        </div>
+                        <p className="text-white font-medium mt-1 truncate">{lead.title}</p>
+                        <p className="text-gray-500 text-xs mt-0.5">
+                          {lead.specific_service || "General"}
+                          {lead.budget_text && (
+                            <span className="text-green-400 ml-2">{lead.budget_text}</span>
+                          )}
+                        </p>
+                      </div>
+                      <div className="flex items-center gap-2 shrink-0">
+                        <select
+                          value={lead.status}
+                          onChange={e => handleStatusChange(lead.id, e.target.value)}
+                          onClick={e => e.stopPropagation()}
+                          className="bg-gray-700 border border-gray-600 text-gray-300 text-xs rounded px-2 py-1 focus:outline-none"
+                        >
+                          {["new", "reviewed", "contacted", "closed"].map(s => (
+                            <option key={s} value={s}>{s}</option>
+                          ))}
+                        </select>
+                        <button
+                          onClick={() => navigate(`/outreach/${lead.id}`)}
+                          title="Generate outreach message"
+                          className="text-indigo-400 hover:text-indigo-300 transition-colors"
+                        >
+                          <MessageSquare size={15} />
+                        </button>
+                        <a
+                          href={lead.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open original post"
+                          className="text-gray-400 hover:text-white transition-colors"
+                        >
+                          <ExternalLink size={15} />
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }

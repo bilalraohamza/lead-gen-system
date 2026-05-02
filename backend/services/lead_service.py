@@ -1,6 +1,5 @@
 from sqlalchemy.orm import Session
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy import or_
 from models import Lead
 from datetime import datetime
 
@@ -62,16 +61,13 @@ def get_leads(
     intent: str = None,
     status: str = None,
     category: str = None,
+    min_score: float = 0.0,
     search: str = None,
     sort_by: str = "score",
     sort_dir: str = "desc",
-    min_score: float = 0.0,
     limit: int = 50,
     offset: int = 0,
 ) -> list[Lead]:
-    """
-    Fetches leads with optional filters.
-    """
     query = db.query(Lead)
 
     if source:
@@ -82,33 +78,23 @@ def get_leads(
         query = query.filter(Lead.status == status)
     if category:
         query = query.filter(Lead.specific_service == category)
-    if search:
-        pattern = f"%{search}%"
-        query = query.filter(
-            or_(
-                Lead.title.ilike(pattern),
-                Lead.body.ilike(pattern),
-                Lead.author.ilike(pattern),
-            )
-        )
     if min_score > 0:
         query = query.filter(Lead.score >= min_score)
+    if search:
+        query = query.filter(Lead.title.ilike(f"%{search}%"))
 
-    sort_columns = {
-        "score": Lead.score,
-        "date": Lead.collected_at,
-        "posted_at": Lead.posted_at,
-    }
-    sort_column = sort_columns.get(sort_by, Lead.score)
-    order_clause = sort_column.asc() if sort_dir == "asc" else sort_column.desc()
+    sort_column = {
+        "score":        Lead.score,
+        "date":         Lead.collected_at,
+        "posted_at":    Lead.posted_at,
+    }.get(sort_by, Lead.score)
 
-    return (
-        query
-        .order_by(order_clause)
-        .offset(offset)
-        .limit(limit)
-        .all()
-    )
+    if sort_dir == "asc":
+        query = query.order_by(sort_column.asc())
+    else:
+        query = query.order_by(sort_column.desc())
+
+    return query.offset(offset).limit(limit).all()
 
 
 def get_lead_by_id(db: Session, lead_id: int) -> Lead | None:

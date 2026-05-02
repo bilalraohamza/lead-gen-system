@@ -5,6 +5,7 @@ import {
   updateIncludeKeywords, updateBlacklistKeywords,
   updateCustomUrls, updateAlertScore,
   updateSenderName, updateSenderServices,
+  updateStrictPrefilter,
   resetSettings, getAiSuggestions,
 } from "../api/leads"
 import {
@@ -55,7 +56,7 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
 
   const handleSuggest = async () => {
     if (!category) {
-      setSuggestErr("Select a service category first to get suggestions.")
+      setSuggestErr("Choose or type an AI suggestion context first.")
       setTimeout(() => setSuggestErr(""), 3000)
       return
     }
@@ -111,7 +112,7 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
           <button
             onClick={handleSuggest}
             disabled={suggesting}
-            title="Get AI suggestions based on selected category"
+            title="Get AI suggestions based on the current suggestion context"
             className="flex items-center gap-1.5 px-3 py-2 bg-purple-700 hover:bg-purple-600 disabled:opacity-50 text-white rounded-lg text-sm transition-colors"
           >
             {suggesting
@@ -377,23 +378,37 @@ export default function Settings() {
           onReplace={v => setCategories(v)}
           placeholder="e.g. Video editing, Logo design, WordPress..."
         />
-
-        {categories.length > 0 && (
-          <div className="flex items-center gap-3 pt-1">
-            <span className="text-gray-500 text-xs">Get AI suggestions based on:</span>
-            <select
-              value={selectedCategory}
-              onChange={e => setSelectedCategory(e.target.value)}
-              className="bg-gray-800 border border-gray-700 text-gray-300 text-xs rounded-lg px-2 py-1.5 focus:outline-none focus:border-indigo-500"
-            >
-              <option value="">Select a category...</option>
-              {categories.map(c => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          </div>
-        )}
       </Section>
+
+      {/* Category selector for AI suggestions - shown globally above subreddits/keywords */}
+      <div className="bg-gray-900 border border-indigo-800 rounded-xl p-4">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Sparkles size={15} className="text-purple-400 shrink-0" />
+          <span className="text-gray-300 text-sm font-medium">AI Suggestion Context:</span>
+          <select
+            value={categories.includes(selectedCategory) ? selectedCategory : ""}
+            onChange={e => setSelectedCategory(e.target.value)}
+            className="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 focus:outline-none focus:border-indigo-500"
+          >
+            <option value="">Select saved category...</option>
+            {categories.map(c => (
+              <option key={c} value={c}>{c}</option>
+            ))}
+          </select>
+          <span className="text-gray-600 text-xs">or type custom:</span>
+          <input
+            type="text"
+            placeholder="e.g. Shopify development..."
+            value={selectedCategory}
+            onChange={e => setSelectedCategory(e.target.value)}
+            className="bg-gray-800 border border-gray-700 text-gray-300 text-sm rounded-lg px-3 py-2 w-56 focus:outline-none focus:border-indigo-500"
+          />
+        </div>
+        <p className="text-gray-600 text-xs mt-2 ml-6">
+          This context is used when you click AI Suggest on any section below.
+          You can type any niche even if it is not saved as a category yet.
+        </p>
+      </div>
 
       <Section
         icon={Globe}
@@ -542,7 +557,37 @@ export default function Settings() {
             Save
           </button>
         </div>
-        <p className="text-gray-600 text-xs">
+
+        <div className="mt-5 border-t border-gray-800 pt-5">
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-3">
+              <span className="text-gray-400 text-sm">Pre-filter strictness:</span>
+              <button
+                onClick={async () => {
+                  const current = config?.strict_prefilter ?? false
+                  await updateStrictPrefilter(!current)
+                  setConfig(c => ({ ...c, strict_prefilter: !current }))
+                  notify(`Switched to ${!current ? "strict" : "loose"} mode.`)
+                }}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  config?.strict_prefilter ? "bg-indigo-600" : "bg-gray-600"
+                }`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                  config?.strict_prefilter ? "translate-x-6" : "translate-x-1"
+                }`} />
+              </button>
+              <span className="text-gray-400 text-sm">
+                {config?.strict_prefilter ? "Strict (saves API)" : "Loose (more accurate)"}
+              </span>
+            </div>
+          </div>
+          <p className="text-gray-600 text-xs mt-3">
+            Loose mode is recommended when exploring a new niche. Switch to strict once your keywords are well-tuned.
+          </p>
+        </div>
+
+        <p className="text-gray-600 text-xs mt-3">
           Current threshold: leads scoring {alertScore} or above trigger an instant Telegram message.
         </p>
       </Section>

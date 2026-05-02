@@ -10,14 +10,33 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("OPENROUTER_API_KEY")
 OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Change FREE_MODELS to priority order (fastest and most reliable first)
+# Change FREE_MODELS to priority order (most reliable first)
 FREE_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct:free",  # primary, fastest
-    "openai/gpt-oss-120b:free",                 # fallback 1
-    "google/gemma-4-31b-it:free",               # fallback 2
-    "nvidia/nemotron-3-super-120b-a12b:free",   # fallback 3
-    "qwen/qwen3-next-80b-a3b-instruct:free",    # fallback 4
+    "openai/gpt-oss-120b:free",                  # most reliable, rarely limited
+    "nvidia/nemotron-3-super-120b-a12b:free",     # solid fallback
+    "google/gemma-4-31b-it:free",                 # fast and stable
+    "qwen/qwen3-next-80b-a3b-instruct:free",      # good quality
+    "meta-llama/llama-3.3-70b-instruct:free",     # last resort, always limited
 ]
+
+# Tracks models that are rate limited during current run
+_rate_limited_models = set()
+_rate_limit_reset_time = {}
+
+
+def _is_available(model: str) -> bool:
+    if model not in _rate_limited_models:
+        return True
+    reset_time = _rate_limit_reset_time.get(model, 0)
+    if time.time() > reset_time:
+        _rate_limited_models.discard(model)
+        return True
+    return False
+
+
+def _mark_rate_limited(model: str):
+    _rate_limited_models.add(model)
+    _rate_limit_reset_time[model] = time.time() + 60  # skip for 60 seconds
 
 # Now this works because FREE_MODELS already exists
 model_cycle = cycle(FREE_MODELS)
@@ -79,19 +98,28 @@ def call_openrouter(prompt: str, model: str) -> str:
 
 
 def classify_lead(title: str, body: str) -> dict:
+    services = get_services_context()
+
     prompt = f"""
-You are a lead qualification assistant for a programming services business.
+You are a lead qualification assistant for a freelance services business.
 
-Our services:
-{get_services_context()}
+The business offers these services:
+{services}
 
-Analyze this post and return a JSON response only.
-No extra text, no markdown, no backticks, no explanation outside the JSON.
+Your job is to decide if this post is from someone who wants to HIRE or PAY for any of these services.
 
 Post Title: {title}
 Post Body: {body[:500]}
 
-Return exactly this JSON structure:
+Important rules:
+- A client post does NOT need to use technical words. "I need someone to cut my YouTube videos" is a hiring post for video editing even without saying "video editor".
+- Focus on the INTENT of the poster. Are they trying to get something done by paying someone?
+- If the post is from someone OFFERING their services, mark it as not_hiring.
+- If the post is a question, discussion, or advice request with no hiring intent, mark it as not_hiring.
+- Only mark as "hiring" if there is clear intent to pay someone for work.
+
+Return a JSON object only. No extra text, no markdown, no backticks.
+
 {{
     "intent_label": "hiring" or "not_hiring" or "maybe",
     "is_relevant": true or false,
@@ -100,15 +128,15 @@ Return exactly this JSON structure:
     "urgency": "high" or "medium" or "low",
     "specific_service": "which of our services this matches or null"
 }}
-
-Rules:
-- intent_label is "hiring" only if they are clearly looking to pay someone
-- is_relevant is true only if it matches one of our services
-- If the post is someone offering services, intent_label is "not_hiring"
-- Extract budget_text exactly as written in the post
 """
 
-    for model in FREE_MODELS:
+    available = [m for m in FREE_MODELS if _is_available(m)]
+    if not available:
+        print("[Classifier] All models rate limited, waiting 15s...")
+        time.sleep(15)
+        available = FREE_MODELS
+
+    for model in available:
         try:
             raw = call_openrouter(prompt, model)
             raw = raw.replace("```json", "").replace("```", "").strip()
@@ -123,15 +151,16 @@ Rules:
             return result
 
         except json.JSONDecodeError:
-            print(f"[Classifier] JSON parse failed for {model}, trying next...")
+            print(f"[Classifier] JSON parse failed for {model}")
             continue
 
         except Exception as e:
             error_str = str(e)
             if "429" in error_str:
-                print(f"[Classifier] {model} rate limited, switching to next model...")
+                print(f"[Classifier] {model} rate limited, blacklisting for 60s...")
+                _mark_rate_limited(model)
                 continue
-            print(f"[Classifier] {model} error: {e}, trying next...")
+            print(f"[Classifier] {model} error: {e}")
             continue
 
     print("[Classifier] All models failed, returning default")

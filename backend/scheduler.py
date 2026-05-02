@@ -5,7 +5,7 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from database import SessionLocal
-from services.lead_service import save_leads_bulk, get_leads
+from services.lead_service import get_leads
 from services.telegram_bot import send_daily_summary
 from collectors.reddit_collector import collect_reddit_leads
 from collectors.hn_collector import collect_hn_leads
@@ -55,21 +55,20 @@ def run_pipeline():
 
     if not raw_leads:
         logger.warning("No raw leads collected. Skipping pipeline.")
-        return
+        return 0
 
-    # Filter and score
-    processed = process_leads(raw_leads)
-    logger.info(f"Processed leads: {len(processed)}")
-
-    # Save to database
+    # Save leads as they are classified
+    processed_count = 0
     db = SessionLocal()
     try:
-        result = save_leads_bulk(db, processed)
-        logger.info(f"Saved: {result['saved']} | Skipped duplicates: {result['skipped_duplicates']}")
+        processed = process_leads(raw_leads, db=db)
+        processed_count = len(processed)
+        logger.info(f"Processed leads: {len(processed)}")
     finally:
         db.close()
 
     logger.info("Pipeline complete.")
+    return processed_count
 
 
 def send_morning_summary():
