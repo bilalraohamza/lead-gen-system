@@ -15,18 +15,36 @@ import {
   Sparkles, CheckSquare, Square, Trash2,
 } from "lucide-react"
 
-function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, suggestType }) {
-  const [input, setInput] = useState("")
-  const [selected, setSelected] = useState([])
-  const [suggesting, setSuggesting] = useState(false)
+function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, suggestType, onSave, normalizeItem }) {
+  const [input,       setInput]       = useState("")
+  const [selected,    setSelected]    = useState([])
+  const [suggesting,  setSuggesting]  = useState(false)
   const [suggestions, setSuggestions] = useState([])
-  const [suggestErr, setSuggestErr] = useState("")
+  const [suggestErr,  setSuggestErr]  = useState("")
+  const [saveStatus,  setSaveStatus]  = useState("")
 
-  const handleAdd = () => {
-    const val = input.trim()
+  const cleanItem = value => (normalizeItem ? normalizeItem(value) : value).trim()
+
+  const triggerSave = async (newItems) => {
+    if (!onSave) return
+    setSaveStatus("saving")
+    try {
+      await onSave(newItems)
+      setSaveStatus("saved")
+      setTimeout(() => setSaveStatus(""), 2000)
+    } catch {
+      setSaveStatus("error")
+      setTimeout(() => setSaveStatus(""), 3000)
+    }
+  }
+
+  const handleAdd = async () => {
+    const val = cleanItem(input)
     if (!val || items.includes(val)) return
+    const newItems = [...items, val]
     onAdd(val)
     setInput("")
+    await triggerSave(newItems)
   }
 
   const handleKey = (e) => {
@@ -39,24 +57,28 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
     )
   }
 
-  const toggleSelectAll = () => {
-    if (selected.length === items.length) {
-      setSelected([])
-    } else {
-      setSelected([...items])
-    }
+  const handleRemove = async (item) => {
+    const newItems = items.filter(i => i !== item)
+    onRemove(item)
+    setSelected(s => s.filter(i => i !== item))
+    await triggerSave(newItems)
   }
 
-  const deleteSelected = () => {
+  const toggleSelectAll = () => {
+    setSelected(s => s.length === items.length ? [] : [...items])
+  }
+
+  const deleteSelected = async () => {
     if (selected.length === 0) return
     const remaining = items.filter(i => !selected.includes(i))
     onReplace(remaining)
     setSelected([])
+    await triggerSave(remaining)
   }
 
   const handleSuggest = async () => {
     if (!category) {
-      setSuggestErr("Choose or type an AI suggestion context first.")
+      setSuggestErr("Set AI Suggestion Context above first.")
       setTimeout(() => setSuggestErr(""), 3000)
       return
     }
@@ -72,23 +94,33 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
     setSuggesting(false)
   }
 
-  const addSuggestion = (val) => {
-    if (!items.includes(val)) {
-      onAdd(val)
+  const addSuggestion = async (val) => {
+    const item = cleanItem(val)
+    if (!item || items.includes(item)) {
+      setSuggestions(s => s.filter(i => i !== val))
+      return
     }
+    const newItems = [...items, item]
+    onAdd(item)
     setSuggestions(s => s.filter(i => i !== val))
+    await triggerSave(newItems)
   }
 
-  const addAllSuggestions = () => {
-    const newItems = suggestions.filter(s => !items.includes(s))
-    if (newItems.length > 0) {
-      onReplace([...items, ...newItems])
+  const addAllSuggestions = async () => {
+    const newOnes = suggestions
+      .map(cleanItem)
+      .filter((s, index, arr) => s && !items.includes(s) && arr.indexOf(s) === index)
+    if (newOnes.length === 0) {
+      setSuggestions([])
+      return
     }
+    const newItems = [...items, ...newOnes]
+    onReplace(newItems)
     setSuggestions([])
+    await triggerSave(newItems)
   }
 
   const allSelected = items.length > 0 && selected.length === items.length
-  const someSelected = selected.length > 0
 
   return (
     <div className="space-y-3">
@@ -122,6 +154,22 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
             {suggesting ? "Thinking..." : "AI Suggest"}
           </button>
         )}
+
+        {saveStatus === "saving" && (
+          <span className="flex items-center gap-1 text-gray-400 text-xs">
+            <Loader2 size={12} className="animate-spin" /> Saving...
+          </span>
+        )}
+        {saveStatus === "saved" && (
+          <span className="flex items-center gap-1 text-green-400 text-xs">
+            Saved
+          </span>
+        )}
+        {saveStatus === "error" && (
+          <span className="flex items-center gap-1 text-red-400 text-xs">
+            Save failed
+          </span>
+        )}
       </div>
 
       {suggestErr && (
@@ -133,7 +181,7 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
           <div className="flex items-center justify-between">
             <p className="text-purple-300 text-xs font-medium flex items-center gap-1.5">
               <Sparkles size={12} />
-              AI Suggestions - click to add
+              AI Suggestions - click to add instantly
             </p>
             <button
               onClick={addAllSuggestions}
@@ -149,7 +197,7 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
                 onClick={() => addSuggestion(s)}
                 className={`text-xs px-2.5 py-1.5 rounded-full border transition-colors ${
                   items.includes(s)
-                    ? "border-gray-700 text-gray-600 cursor-not-allowed line-through"
+                    ? "border-gray-700 text-gray-600 line-through cursor-not-allowed"
                     : "border-purple-700 text-purple-300 hover:bg-purple-800 hover:text-white"
                 }`}
               >
@@ -173,7 +221,7 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
             {allSelected ? "Deselect all" : "Select all"}
           </button>
 
-          {someSelected && (
+          {selected.length > 0 && (
             <button
               onClick={deleteSelected}
               className="flex items-center gap-1.5 text-xs text-red-400 hover:text-red-300 transition-colors"
@@ -202,7 +250,7 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
             }
             {item}
             <button
-              onClick={e => { e.stopPropagation(); onRemove(item); setSelected(s => s.filter(i => i !== item)) }}
+              onClick={e => { e.stopPropagation(); handleRemove(item) }}
               className="text-gray-500 hover:text-red-400 transition-colors ml-0.5"
             >
               <X size={11} />
@@ -210,36 +258,24 @@ function TagInput({ items, onAdd, onRemove, onReplace, placeholder, category, su
           </span>
         ))}
         {items.length === 0 && (
-          <span className="text-gray-600 text-xs italic">Nothing added yet</span>
+          <span className="text-gray-600 text-xs italic">Nothing added yet. Type above and press Enter.</span>
         )}
       </div>
     </div>
   )
 }
 
-function Section({ icon: Icon, title, description, children, onSave, saving }) {
+function Section({ icon: Icon, title, description, children }) {
   return (
     <div className="bg-gray-900 border border-gray-800 rounded-xl p-5 space-y-4">
-      <div className="flex items-start justify-between">
-        <div className="flex items-start gap-3">
-          <div className="p-2 bg-gray-800 rounded-lg mt-0.5">
-            <Icon size={15} className="text-indigo-400" />
-          </div>
-          <div>
-            <h3 className="text-white font-semibold text-sm">{title}</h3>
-            <p className="text-gray-500 text-xs mt-0.5">{description}</p>
-          </div>
+      <div className="flex items-start gap-3">
+        <div className="p-2 bg-gray-800 rounded-lg mt-0.5 shrink-0">
+          <Icon size={15} className="text-indigo-400" />
         </div>
-        {onSave && (
-          <button
-            onClick={onSave}
-            disabled={saving}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-lg text-xs transition-colors"
-          >
-            {saving ? <Loader2 size={12} className="animate-spin" /> : <Save size={12} />}
-            {saving ? "Saving..." : "Save"}
-          </button>
-        )}
+        <div>
+          <h3 className="text-white font-semibold text-sm">{title}</h3>
+          <p className="text-gray-500 text-xs mt-0.5">{description}</p>
+        </div>
       </div>
       {children}
     </div>
@@ -367,15 +403,14 @@ export default function Settings() {
       <Section
         icon={Tag}
         title="Service Categories"
-        description="What services are you offering? The AI uses these to decide if a lead is relevant to you. Add a new category like 'Video editing' and the system will start finding those leads."
-        onSave={() => save("categories", updateCategories, categories)}
-        saving={saving["categories"]}
+        description="What services are you offering? The AI uses these to decide if a lead is relevant. Add a category and press Enter to save instantly."
       >
         <TagInput
           items={categories}
           onAdd={v => setCategories(p => [...p, v])}
           onRemove={v => setCategories(p => p.filter(i => i !== v))}
-          onReplace={v => setCategories(v)}
+          onReplace={setCategories}
+          onSave={updateCategories}
           placeholder="e.g. Video editing, Logo design, WordPress..."
         />
       </Section>
@@ -413,16 +448,16 @@ export default function Settings() {
       <Section
         icon={Globe}
         title="Target Subreddits"
-        description="Which subreddits should the system monitor? Add any subreddit name without the r/ prefix."
-        onSave={() => save("subreddits", updateSubreddits, subreddits)}
-        saving={saving["subreddits"]}
+        description="Which subreddits to monitor. Type a subreddit name and press Enter to add and save instantly."
       >
         <TagInput
           items={subreddits}
           onAdd={v => setSubreddits(p => [...p, v.replace("r/", "")])}
           onRemove={v => setSubreddits(p => p.filter(i => i !== v))}
-          onReplace={v => setSubreddits(v)}
-          placeholder="e.g. videoediting, filmmakers, graphic_design..."
+          onReplace={setSubreddits}
+          onSave={updateSubreddits}
+          normalizeItem={v => v.replace(/^r\//i, "")}
+          placeholder="e.g. entrepreneur, smallbusiness, forhire..."
           category={selectedCategory}
           suggestType="subreddits"
         />
@@ -431,16 +466,15 @@ export default function Settings() {
       <Section
         icon={Search}
         title="Include Keywords"
-        description="Posts must contain at least one of these words to pass the pre-filter. Add keywords matching your new categories."
-        onSave={() => save("include keywords", updateIncludeKeywords, includeKws)}
-        saving={saving["include keywords"]}
+        description="Posts must contain at least one keyword to reach the AI. Press Enter after typing to save instantly."
       >
         <TagInput
           items={includeKws}
           onAdd={v => setIncludeKws(p => [...p, v])}
           onRemove={v => setIncludeKws(p => p.filter(i => i !== v))}
-          onReplace={v => setIncludeKws(v)}
-          placeholder="e.g. video editor, premiere pro, after effects..."
+          onReplace={setIncludeKws}
+          onSave={updateIncludeKeywords}
+          placeholder="e.g. need video editor, looking for developer..."
           category={selectedCategory}
           suggestType="include_keywords"
         />
@@ -449,16 +483,15 @@ export default function Settings() {
       <Section
         icon={Ban}
         title="Blacklist Keywords"
-        description="Posts containing any of these words are immediately rejected before the AI even sees them. Saves API quota."
-        onSave={() => save("blacklist keywords", updateBlacklistKeywords, blacklistKws)}
-        saving={saving["blacklist keywords"]}
+        description="Posts with these words are immediately skipped. Press Enter to save instantly."
       >
         <TagInput
           items={blacklistKws}
           onAdd={v => setBlacklistKws(p => [...p, v])}
           onRemove={v => setBlacklistKws(p => p.filter(i => i !== v))}
-          onReplace={v => setBlacklistKws(v)}
-          placeholder="e.g. unpaid, volunteer, $0..."
+          onReplace={setBlacklistKws}
+          onSave={updateBlacklistKeywords}
+          placeholder="e.g. unpaid, volunteer, for hire..."
           category={selectedCategory}
           suggestType="blacklist_keywords"
         />
@@ -467,15 +500,14 @@ export default function Settings() {
       <Section
         icon={Globe}
         title="Custom URLs to Scrape"
-        description="Add any public webpage URL and the system will try to extract leads from it on every pipeline run. Works best with pages that list jobs or requests."
-        onSave={() => save("custom URLs", updateCustomUrls, customUrls)}
-        saving={saving["custom URLs"]}
+        description="Add any public webpage URL. Press Enter to save instantly."
       >
         <TagInput
           items={customUrls}
           onAdd={v => setCustomUrls(p => [...p, v])}
           onRemove={v => setCustomUrls(p => p.filter(i => i !== v))}
-          onReplace={v => setCustomUrls(v)}
+          onReplace={setCustomUrls}
+          onSave={updateCustomUrls}
           placeholder="e.g. https://example.com/jobs..."
         />
         <p className="text-gray-600 text-xs">
