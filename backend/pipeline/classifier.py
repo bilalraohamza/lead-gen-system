@@ -101,32 +101,39 @@ def classify_lead(title: str, body: str) -> dict:
     services = get_services_context()
 
     prompt = f"""
-You are a lead qualification assistant for a freelance services business.
+You are a lead qualification expert for a freelance services marketplace.
 
-The business offers these services:
+Available services:
 {services}
 
-Your job is to decide if this post is from someone who wants to HIRE or PAY for any of these services.
+Analyze this post and classify the poster's intent.
 
 Post Title: {title}
-Post Body: {body[:500]}
+Post Body: {body[:600]}
 
-Important rules:
-- A client post does NOT need to use technical words. "I need someone to cut my YouTube videos" is a hiring post for video editing even without saying "video editor".
-- Focus on the INTENT of the poster. Are they trying to get something done by paying someone?
-- If the post is from someone OFFERING their services, mark it as not_hiring.
-- If the post is a question, discussion, or advice request with no hiring intent, mark it as not_hiring.
-- Only mark as "hiring" if there is clear intent to pay someone for work.
+Think step by step:
+1. Who is writing this post? A client looking to hire, or a freelancer offering services?
+2. Is there a specific task or project they want done?
+3. Is there any indication they will pay for this work?
+4. Does this match any of the available services, even loosely?
 
-Return a JSON object only. No extra text, no markdown, no backticks.
+Classification rules:
+- "hiring": Poster clearly wants to pay someone to do work for them. Budget may or may not be mentioned. Even vague posts like "looking for someone to help with X" count if there is clear intent to hire.
+- "maybe": Poster might be looking to hire but the intent is unclear. Could be a question that leads to hiring, or a business problem they need solved.
+- "not_hiring": Poster is offering their own services, asking a technical question for self-learning, sharing news/opinions, or the post has no commercial intent at all.
+
+Relevance rule:
+- "is_relevant" is true if the post relates to ANY of the listed services, even broadly. A post about "automating my Excel reports" is relevant to Python automation even if it does not say Python.
+
+Return ONLY a valid JSON object. No text before or after it. No markdown.
 
 {{
-    "intent_label": "hiring" or "not_hiring" or "maybe",
-    "is_relevant": true or false,
-    "reason": "one sentence explaining your decision",
-    "budget_text": "extracted budget string or null if none mentioned",
-    "urgency": "high" or "medium" or "low",
-    "specific_service": "which of our services this matches or null"
+    "intent_label": "hiring",
+    "is_relevant": true,
+    "reason": "Single sentence explaining your decision",
+    "budget_text": "exact budget string from post or null",
+    "urgency": "high",
+    "specific_service": "closest matching service from the list or null"
 }}
 """
 

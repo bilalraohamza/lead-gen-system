@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from database import get_db
 from models import Lead
@@ -62,12 +63,34 @@ def get_categories(db: Session = Depends(get_db)):
     return {"categories": categories}
 
 
+class BulkDeleteRequest(BaseModel):
+    lead_ids: list[int]
+
+
 @router.get("/{lead_id}")
 def get_lead(lead_id: int, db: Session = Depends(get_db)):
     lead = get_lead_by_id(db, lead_id)
     if not lead:
         raise HTTPException(status_code=404, detail="Lead not found")
     return lead.__dict__
+
+
+@router.delete("/{lead_id}")
+def delete_lead(lead_id: int, db: Session = Depends(get_db)):
+    from services.lead_service import delete_lead
+
+    success = delete_lead(db, lead_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Lead not found")
+    return {"message": "Lead deleted"}
+
+
+@router.post("/delete-bulk")
+def delete_leads_bulk(request: BulkDeleteRequest, db: Session = Depends(get_db)):
+    from services.lead_service import delete_leads_bulk
+
+    count = delete_leads_bulk(db, request.lead_ids)
+    return {"message": f"Deleted {count} leads", "count": count}
 
 
 @router.patch("/{lead_id}/status")

@@ -33,32 +33,32 @@ def generate_outreach_message(lead: dict, sender_name: str = None) -> str:
     }.get(lead.get("source", ""), "online post")
 
     prompt = f"""
-You are an expert freelance consultant writing a personalized outreach message.
+You are a freelance business development expert writing a cold outreach message.
 
-The sender's name is {sender_name}.
-The sender offers these services: {sender_services}
+Sender name: {sender_name}
+Sender offers: {sender_services}
 
-Write a short outreach message for this lead. The message will be sent as a direct message or email.
-
-Lead details:
-Title: {lead.get("title", "")}
-Description: {lead.get("body", "")[:400]}
+You are writing to someone who posted this online:
 Source: {source_context}
-Budget mentioned: {lead.get("budget_text") or "Not mentioned"}
-Service needed: {lead.get("specific_service") or "Programming help"}
+Title: {lead.get("title", "")}
+Their post: {lead.get("body", "")[:500]}
+Budget they mentioned: {lead.get("budget_text") or "not mentioned"}
+Service they need: {lead.get("specific_service") or "programming help"}
 
-Rules for the message:
-- Maximum 150 words
-- Sound human, warm, and specific to their problem
-- Do not use generic phrases like "I hope this message finds you well"
-- Mention one specific detail from their post to show you read it
-- Briefly state what you can do for them
-- End with a simple call to action like asking if they want to discuss
-- Do not include subject line, just the message body
-- Do not use bullet points in the message
-- Write in first person as {sender_name}
-- Sound confident but not salesy
-- Do not mention AI wrote this
+Write a short outreach message following these rules strictly:
+1. Maximum 120 words total
+2. First sentence must reference something SPECIFIC from their post, not a generic opener
+3. Second part explains briefly what {sender_name} can do for their exact problem
+4. End with one simple question that invites a reply, not a call to action like "let's hop on a call"
+5. No subject line
+6. No bullet points
+7. No em dashes
+8. Sound like a real person, not a template
+9. Never say "I came across your post" or "I noticed you" or "I hope this finds you well"
+10. Never mention AI wrote this
+11. Match the tone of their post. If they wrote casually, write casually. If formal, be professional.
+
+Write only the message body. Nothing else.
 """
 
     for model in OUTREACH_MODELS:

@@ -101,6 +101,21 @@ def get_lead_by_id(db: Session, lead_id: int) -> Lead | None:
     return db.query(Lead).filter(Lead.id == lead_id).first()
 
 
+def delete_lead(db: Session, lead_id: int) -> bool:
+    lead = get_lead_by_id(db, lead_id)
+    if not lead:
+        return False
+    db.delete(lead)
+    db.commit()
+    return True
+
+
+def delete_leads_bulk(db: Session, lead_ids: list[int]) -> int:
+    deleted = db.query(Lead).filter(Lead.id.in_(lead_ids)).delete(synchronize_session=False)
+    db.commit()
+    return deleted
+
+
 def update_lead_status(db: Session, lead_id: int, status: str) -> Lead | None:
     lead = get_lead_by_id(db, lead_id)
     if not lead:

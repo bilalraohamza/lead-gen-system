@@ -15,6 +15,12 @@ export const getLead = (id) =>
 export const updateStatus = (id, status) =>
   api.patch(`/leads/${id}/status`, null, { params: { status } })
 
+export const deleteLead = (id) =>
+  api.delete(`/leads/${id}`)
+
+export const deleteLeadsBulk = (lead_ids) =>
+  api.post("/leads/delete-bulk", { lead_ids })
+
 export const generateOutreach = (id) =>
   api.post(`/outreach/${id}/generate`)
 
