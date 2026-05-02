@@ -22,7 +22,8 @@ export default function Dashboard() {
 
   const fetchData = useCallback(() => {
     getStats().then(r => setStats(r.data)).catch(() => {})
-    getLeads({ limit: 5, min_score: 0 }).then(r => setLeads(r.data.leads || [])).catch(() => {})
+    getLeads({ limit: 5, min_score: 0, sort_by: "date", sort_dir: "desc" })
+      .then(r => setLeads(r.data.leads || [])).catch(() => {})
   }, [])
 
   const notify = useCallback((text, type = "info") => {
